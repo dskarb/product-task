@@ -1,66 +1,97 @@
-type Color = "red" | "blue" | "yellow" | string;
-type Size = "s" | "m" | "l" | "xl" | "xxl";
-type Currency = "PLN" | "USD";
+export type {
+  Color,
+  Size,
+  Currency,
+  ColorValue,
+  SizeValue,
+  ComponentValue,
+  ColorOption,
+  SizeOption,
+  ComponentOption,
+  ProductOption,
+  ColorSelection,
+  SizeSelection,
+  ComponentSelection,
+  ProductSelection,
+  SelectionFromOption,
+  SelectionCondition,
+  SelectionEffect,
+  SelectionRule,
+  Product,
+  SimpleProduct,
+  ConfigurableProduct,
+} from './types';
 
-type SelectionRuleCondition =
-  | { attribute: "color"; value: Color }
-  | { attribute: "size"; value: Size };
+import type { Product as ProductType, ProductOption, SelectionRule } from './types';
 
-type SelectionRuleEffect =
-  | { effect: "out_of_stock" | "unavailable" }
-  | { effect: "out_of_stock" | "unavailable" };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export type SelectionRule = {
-  if: SelectionRuleCondition;
-  then: SelectionRuleEffect;
-};
-
-export interface ComponentType {
-  id: string;
-  name: string;
-  price: number;
-  currency: Currency;
-  stock: number;
+/** Resolve which rules are active given the current set of selections */
+function getActiveEffects(
+  rules: SelectionRule[],
+  selections: Map<string, string>,
+) {
+  return rules.filter((rule) => {
+    const selected = selections.get(rule.if.optionId);
+    return selected === rule.if.value;
+  });
 }
 
-export interface ProductType {
-  id: string;
-  name: string;
-  price: number;
-  currency: Currency;
-  stock: number;
-  color?: Color;
-  size?: Size;
-  components?: ComponentType[];
-  selectionRules?: SelectionRule[];
+// ─── Component ────────────────────────────────────────────────────────────────
+
+interface ProductProps {
+  product: ProductType;
+  /** optionId → chosen value string */
+  selections?: Map<string, string>;
 }
 
-const Product = (product: ProductType) => {
+const Product = ({ product, selections = new Map() }: ProductProps) => {
+  const activeEffects = product.selectionRules
+    ? getActiveEffects(product.selectionRules, selections)
+    : [];
+
+  const isOutOfStock =
+    product.stock === 0 ||
+    activeEffects.some((r) => r.then.effect === 'out_of_stock');
+
   return (
     <div>
       <p>Name: {product.name}</p>
+      {product.description && <p>{product.description}</p>}
       <p>
-        Price: {product.price} {product.currency}
+        Price: {product.basePrice} {product.currency}
       </p>
-      {product.size && <p>Size: {product.size}</p>}
-      {product.color && <p>Color: {product.color}</p>}
-      {product.components && (
-        <p>
-          Components:{" "}
-          {product.components.map((component, i) => (
-            <div key={i}>{component.name}</div>
-          ))}
-        </p>
-      )}
-      {product.selectionRules &&
-        product.selectionRules.map((rule, i) => {
-          console.log(rule);
+      <p>In stock: {isOutOfStock ? 'No' : product.stock}</p>
+
+      {product.options.map((option: ProductOption) => {
+        if (option.kind === 'color') {
           return (
-            rule.if.attribute === 'color' &&
-            rule.if.value === product.color &&
-            rule.then.effect
+            <p key={option.id}>
+              Color options: {option.values.map((v) => v.label).join(', ')}
+            </p>
           );
-        })}
+        }
+        if (option.kind === 'size') {
+          return (
+            <p key={option.id}>
+              Size options: {option.values.map((v) => v.label).join(', ')}
+            </p>
+          );
+        }
+        if (option.kind === 'component') {
+          return (
+            <div key={option.id}>
+              <p>{option.label}:</p>
+              {option.values.map((v) => (
+                <div key={v.value}>
+                  {v.label}
+                  {v.priceModifier !== undefined && ` (+${v.priceModifier})`}
+                </div>
+              ))}
+            </div>
+          );
+        }
+      })}
     </div>
   );
 };

@@ -1,72 +1,113 @@
-import { useState } from "react";
+
 import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import "./App.css";
-import Product, { type ProductType } from "./product/Product";
+import Product from "./product/Product";
+import type { SimpleProduct, ConfigurableProduct } from "./product/types";
 
-const productsList: ProductType[] = [
-  // {
-  //   id: "1234",
-  //   name: "Test Name",
-  //   price: 999,
-  //   currency: "PLN",
-  //   stock: 1234,
-  //   components: [
-  //     {
-  //       id: "comp1",
-  //       name: "Test Component",
-  //       price: 999,
-  //       currency: "PLN",
-  //       stock: 1234,
-  //     },
-  //     {
-  //       id: "comp2",
-  //       name: "Test Component 2",
-  //       price: 999,
-  //       currency: "PLN",
-  //       stock: 1234,
-  //     },
-  //     {
-  //       id: "comp3",
-  //       name: "Test Component 3",
-  //       price: 999,
-  //       currency: "PLN",
-  //       stock: 1234,
-  //     },
-  //   ],
-  // },
+// ── Simple product: a mug with color and size options ─────────────────────────
+const mug: SimpleProduct = {
+  id: "mug-001",
+  name: "Classic Mug",
+  description: "A ceramic mug — pick your colour and size.",
+  basePrice: 29,
+  currency: "PLN",
+  stock: 200,
+  options: [
+    {
+      kind: "color",
+      id: "color",
+      label: "Color",
+      values: [
+        { value: "red",   label: "Red",   hexCode: "#ef4444" },
+        { value: "blue",  label: "Blue",  hexCode: "#3b82f6" },
+        { value: "white", label: "White", hexCode: "#ffffff" },
+      ],
+    },
+    {
+      kind: "size",
+      id: "size",
+      label: "Size",
+      values: [
+        { value: "s",  label: "Small (250 ml)"  },
+        { value: "xl", label: "Large (500 ml)" },
+      ],
+    },
+  ],
+  selectionRules: [
+    {
+      // Red + XXL → out of stock
+      if:   { kind: "color", optionId: "color", value: "red" },
+      then: { effect: "unavailable", optionId: "size", value: "xxl" },
+    },
+  ],
+};
 
-  // { id: "222", name: "Test Name", price: 999, currency: "PLN", stock: 1234 },
-  {
-    id: "1233334",
-    name: "Test Name",
-    price: 999,
-    currency: "PLN",
-    stock: 1234,
-    size: "xl",
-    color: "blue",
-    selectionRules: [
-      {
-        if: { attribute: "color", value: "blue" },
-        then: { effect: "out_of_stock" },
-      },
-    ],
-  },
-  // { id: "14234", name: "Test Name", price: 999, currency: "PLN", stock: 1234 },
-  // { id: "12434", name: "Test Name", price: 999, currency: "PLN", stock: 1234 },
-  // {
-  //   id: "1255534",
-  //   name: "Test Name",
-  //   price: 999,
-  //   currency: "PLN",
-  //   stock: 1234,
-  // },
-];
+// ── Configurable product: a custom PC where component choices are linked ──────
+const customPc: ConfigurableProduct = {
+  id: "pc-001",
+  name: "Custom PC Builder",
+  description: "Build your perfect machine — motherboard choice limits CPU and RAM options.",
+  basePrice: 999,
+  currency: "USD",
+  stock: 50,
+  options: [
+    {
+      kind: "component",
+      id: "motherboard",
+      label: "Motherboard",
+      values: [
+        { value: "mb-am5",  label: "ASUS ROG X670E (AM5)",  priceModifier: 450 },
+        { value: "mb-lga",  label: "MSI MEG Z790 (LGA1700)", priceModifier: 380 },
+      ],
+    },
+    {
+      kind: "component",
+      id: "cpu",
+      label: "CPU",
+      values: [
+        { value: "ryzen-9-7950x", label: "AMD Ryzen 9 7950X", priceModifier: 700 },
+        { value: "core-i9-13900k", label: "Intel Core i9-13900K", priceModifier: 650 },
+      ],
+    },
+    {
+      kind: "component",
+      id: "ram",
+      label: "RAM",
+      values: [
+        { value: "ddr5-32gb", label: "32 GB DDR5", priceModifier: 180 },
+        { value: "ddr4-32gb", label: "32 GB DDR4", priceModifier: 90  },
+      ],
+    },
+  ],
+  selectionRules: [
+    {
+      // AM5 motherboard → only DDR5 RAM is compatible
+      if:   { kind: "component", optionId: "motherboard", value: "mb-am5" },
+      then: { effect: "restrict_values", optionId: "ram", allowedValues: ["ddr5-32gb"] },
+    },
+    {
+      // AM5 motherboard → only AMD CPUs are compatible
+      if:   { kind: "component", optionId: "motherboard", value: "mb-am5" },
+      then: { effect: "restrict_values", optionId: "cpu", allowedValues: ["ryzen-9-7950x"] },
+    },
+    {
+      // LGA1700 motherboard → only Intel CPUs are compatible
+      if:   { kind: "component", optionId: "motherboard", value: "mb-lga" },
+      then: { effect: "restrict_values", optionId: "cpu", allowedValues: ["core-i9-13900k"] },
+    },
+    {
+      // LGA1700 motherboard → only DDR4 RAM is compatible
+      if:   { kind: "component", optionId: "motherboard", value: "mb-lga" },
+      then: { effect: "restrict_values", optionId: "ram", allowedValues: ["ddr4-32gb"] },
+    },
+  ],
+};
+
+const productsList = [mug, customPc];
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
     <>
       <section id="center">
@@ -77,7 +118,7 @@ function App() {
         </div>
 
         {productsList.map((item, i) => (
-          <Product key={i} {...item} />
+          <Product key={i} product={item} />
         ))}
       </section>
 
